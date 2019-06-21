@@ -110,7 +110,7 @@ class SpinLoopExplorationTechnique(angr.ExplorationTechnique):
 
 
 if __name__ == "__main__":
-    p = angr.Project((sys.argv[1] if len(sys.argv) > 1 else './test.elf'), auto_load_libs=False)
+    p = angr.Project((sys.argv[1] if len(sys.argv) > 1 else './test'), auto_load_libs=False)
 
     main = p.loader.main_object.get_symbol('main')
     cfg = p.analyses.CFGFast()

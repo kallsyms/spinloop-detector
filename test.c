@@ -24,16 +24,13 @@ int main() {
             case 0:
                 puts("END");
                 goto done;
-            case 1: // nop - correct
+            case 1:
                 optlen = 1;
-                puts("NOP CORRECT");
+                puts("NOP");
                 break;
             case 2: // write
                 puts("WRITE");
                 write(1, &ptr[2], optlen-2);
-                break;
-            case 4: // nop - incorrect
-                puts("NOP INCORRECT");
                 break;
             default:
                 puts("INVALID");
