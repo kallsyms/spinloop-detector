@@ -89,7 +89,6 @@ class SpinLoopExplorationTechnique(angr.ExplorationTechnique):
 
             if first_loop_constraint is None:
                 if self.loop.entry.addr in self._unnormalized_bb_addrs(break_bb.addr):
-                    print("Loop entry not constrained by symbolic input")
                     return "deadended"
 
                 continue
@@ -110,24 +109,33 @@ class SpinLoopExplorationTechnique(angr.ExplorationTechnique):
 
 
 if __name__ == "__main__":
-    p = angr.Project((sys.argv[1] if len(sys.argv) > 1 else './test'), auto_load_libs=False)
+    if len(sys.argv) != 2:
+        print(f"Usage: {sys.argv[0]} PROGRAM", file=sys.stderr)
+        sys.exit(1)
 
-    main = p.loader.main_object.get_symbol('main')
+    p = angr.Project(sys.argv[1], auto_load_libs=False)
+
     cfg = p.analyses.CFGFast()
     cfg_norm = p.analyses.CFGFast(normalize=True)
-    loops = p.analyses.LoopFinder()
+    lf = p.analyses.LoopFinder()
 
-    loop = loops.loops[0]
+    # TODO: Ignore things in ctors, etc.
+    for loop in lf.loops:
+        # Sim to loop entry point to gather initial constraints
+        loop_entry_simgr = p.factory.simgr(p.factory.entry_state())
+        loop_entry_simgr.explore(find=[loop.entry.addr])
+        if len(loop_entry_simgr.found) > 0:
+            loop_entry_state = loop_entry_simgr.found[0]
+        else:
+            print(loop, "unable to find input to reach loop entry")
 
-    # Sim to loop entry point to gather initial constraints
-    loop_entry_simgr = p.factory.simgr(p.factory.entry_state())
-    loop_entry_simgr.explore(find=[loop.entry.addr])
-    loop_entry_state = loop_entry_simgr.found[0]
-
-    # now search from the top of the loop back to itself
-    loop_simgr = p.factory.simgr(loop_entry_state)
-    loop_simgr.use_technique(SpinLoopExplorationTechnique(loop_entry_state, loop, cfg))
-    loop_simgr.explore()
-    spinloop_state = loop_simgr.found[0]
-    dos_input = spinloop_state.posix.dumps(0)
-    print(repr(dos_input))
+        # now search from the top of the loop back to itself
+        loop_simgr = p.factory.simgr(loop_entry_state)
+        loop_simgr.use_technique(SpinLoopExplorationTechnique(loop_entry_state, loop, cfg))
+        loop_simgr.explore()
+        if len(loop_simgr.found) > 0:
+            spinloop_state = loop_simgr.found[0]
+            dos_input = spinloop_state.posix.dumps(0)
+            print(loop, repr(dos_input))
+        else:
+            print(loop, "cannot find spinlooping input")
