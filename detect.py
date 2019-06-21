@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import angr
+import sys
 
 
 class SpinLoopExplorationTechnique(angr.ExplorationTechnique):
@@ -41,8 +42,6 @@ class SpinLoopExplorationTechnique(angr.ExplorationTechnique):
         return max(len(list(filter(self._is_at_loop_entry, list(state.history.bbl_addrs) + [state.addr]))) - 1, 0)
 
     def filter(self, simgr, state, **kwargs):
-        print(hex(state.addr))
-
         # If we've broken out of the loop, avoid
         if state.addr in (break_edge[1].addr for break_edge in self.loop.break_edges):
             return "deadended"
@@ -66,9 +65,7 @@ class SpinLoopExplorationTechnique(angr.ExplorationTechnique):
                         break
 
             for bb1, bb2 in zip(bbl_hist[first_loop_start:second_loop_start], bbl_hist[second_loop_start:]):
-                print(hex(bb1), hex(bb2))
                 if not self._unnormalized_bb_addrs(bb1).intersection(self._unnormalized_bb_addrs(bb2)):
-                    print("Avoiding to constrain second loop to match path of first")
                     return "deadended"
 
             return "active"
@@ -91,7 +88,6 @@ class SpinLoopExplorationTechnique(angr.ExplorationTechnique):
                         break
 
             if first_loop_constraint is None:
-                print(f"No constraints around {break_bb.addr:#x}")
                 if self.loop.entry.addr in self._unnormalized_bb_addrs(break_bb.addr):
                     print("Loop entry not constrained by symbolic input")
                     return "deadended"
@@ -99,11 +95,9 @@ class SpinLoopExplorationTechnique(angr.ExplorationTechnique):
                 continue
 
             if first_loop_constraint is not None and second_loop_constraint is None:
-                print(f"Constraint on first loop found ({first_loop_constraint}) for bb {break_bb.addr:#x}, but no second one found")
                 continue
 
             for a, b in zip(first_loop_constraint.ast.args, second_loop_constraint.ast.args):
-                print(f"Constraining {a} == {b}")
                 test_state.add_constraints(a == b)
 
         if test_state.satisfiable():
@@ -116,7 +110,7 @@ class SpinLoopExplorationTechnique(angr.ExplorationTechnique):
 
 
 if __name__ == "__main__":
-    p = angr.Project('./test.elf', auto_load_libs=False)
+    p = angr.Project((sys.argv[1] if len(sys.argv) > 1 else './test.elf'), auto_load_libs=False)
 
     main = p.loader.main_object.get_symbol('main')
     cfg = p.analyses.CFGFast()
